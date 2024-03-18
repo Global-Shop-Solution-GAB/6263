@@ -1,0 +1,153 @@
+Program.Sub.ScreenSU.Start
+Gui.fmMain..Create
+Gui.fmMain..Caption("Convert Sales Order")
+Gui.fmMain..Size(5370,1875)
+Gui.fmMain..MinX(0)
+Gui.fmMain..MinY(0)
+Gui.fmMain..Position(0,0)
+Gui.fmMain..BackColor(-2147483633)
+Gui.fmMain..MousePointer(0)
+Gui.fmMain..Event(UnLoad,fmMain_UnLoad)
+Gui.fmMain.lblSO.Create(Label,"Sales Order",True,2595,255,0,1065,180,True,0,"Arial",8,-2147483633,0)
+Gui.fmMain.txtSO.Create(TextBox,"",True,2595,300,0,1065,390,True,0,"Arial",8,-2147483643,1)
+Gui.fmMain.cmdMod.Create(Button)
+Gui.fmMain.cmdMod.Size(2595,375)
+Gui.fmMain.cmdMod.Position(1065,780)
+Gui.fmMain.cmdMod.Caption("Convert to Blanket Order")
+Gui.fmMain.cmdMod.Event(Click,cmdMod_Click)
+Gui.fmMain.cmdSOBrw.Create(Button)
+Gui.fmMain.cmdSOBrw.Size(630,375)
+Gui.fmMain.cmdSOBrw.Position(3720,360)
+Gui.fmMain.cmdSOBrw.Caption("^")
+Gui.fmMain.cmdSOBrw.Event(Click,cmdSOBrw_Click)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+'TJS, Feb 2021
+'For House of Dootlittle
+'Business Case: Customer requires the ability to convert a standard sales order to a blanket sales order.
+
+'Solution: Create a new menu item under Order Entry > File > Convert to Blanket
+'This will launch a screen with a single input box and a sales order browser.  The browser should include OrderNo, PONo, CustID, Cust Name.
+
+F.Intrinsic.UI.SetBrowserHotTypeAhead(True)
+
+F.Intrinsic.Control.CallSub(SetIcon)
+
+Gui.fmMain..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.cmdSOBrw_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sRet.Declare
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+
+F.Intrinsic.UI.Browser("Select Sales Order","conts","select A.ORDER_NO,A.CUSTOMER_PO,A.CUSTOMER,B.NAME_CUSTOMER from V_ORDER_HEADER A left join V_CUSTOMER_MASTER B on A.CUSTOMER = B.CUSTOMER","ORDER*!*CUSTOMER PO*!*CUSTOMER ID*!*CUSTOMER NAME","75*!*100*!*75*!*150",10000,10000,V.Local.sRet)
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.If(V.Local.sRet,<>,"***CANCEL***")
+	F.Intrinsic.String.Split(V.Local.sRet,"*!*",V.Local.sRet)
+	Gui.fmMain.txtSO.Text(V.Local.sRet(0))
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdSOBrw_Click.End
+
+Program.Sub.cmdMod_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sOrder.Declare
+V.Local.sSQL.Declare
+
+V.Local.sOrder.Set(V.Screen.fmMain!txtSO.Text)
+
+F.Intrinsic.Control.If(V.Local.sOrder.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("Please select an order","Error")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+F.Intrinsic.String.Build("Select ORDER_TYPE from V_ORDER_HEADER where RTRIM(ORDER_NO) = '{0}'",V.Local.sOrder.Trim,V.Local.sSQL)
+F.ODBC.Connection!conts.ExecuteAndReturn(V.Local.sSQL,V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.Local.sSQL.Trim,<>,"")
+	F.Intrinsic.UI.Msgbox("This Sales Order is not standard, please review","Warning")
+	F.ODBC.Connection!conts.Close
+	F.Intrinsic.Control.ExitSub	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("Update ORDER_HEADER set ORDER_TYPE = 'B' where RTRIM(ORDER_NO) = '{0}' and RECORD_NO = '  A'",V.Local.sOrder,V.Local.sSQL)
+F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+
+F.Intrinsic.String.Build("Select ORDER_TYPE from V_ORDER_HEADER where RTRIM(ORDER_NO) = '{0}'",V.Local.sOrder.Trim,V.Local.sSQL)
+F.ODBC.Connection!conts.ExecuteAndReturn(V.Local.sSQL,V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.Local.sSQL.Trim,=,"B")
+	Gui.fmMain.txtSO.Text("")
+	F.Intrinsic.UI.Msgbox("Order converted to Blanket Order","Success!")
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("Order failed to convert to Blanket Order","Warning!")
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdMod_Click.End
+
+Program.Sub.SetIcon.Start
+F.Intrinsic.Control.Try
+V.Local.sForm.Declare
+V.Local.bExists.Declare
+V.Local.sIcon.Declare
+V.Local.iCounter.Declare
+
+F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)
+F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists.Not)
+    F.Intrinsic.String.Build("{0}\GAB\GAS\gss2.ico",V.Caller.PluginsDir,v.Local.sIcon)
+    F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+    F.Intrinsic.Control.If(V.Local.bExists.Not)
+        F.Intrinsic.Control.ExitSub
+    F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.UI.GetFormList(V.Local.sForm)
+F.Intrinsic.String.Split(V.Local.sForm, "*!*", V.Local.sForm)
+
+F.Intrinsic.Control.For(V.Local.iCounter, 0, V.Local.sForm.UBound, 1)
+    Gui.[V.Local.sForm(V.Local.iCounter)]..Icon(V.Local.sIcon)
+F.Intrinsic.Control.Next(V.Local.iCounter)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetIcon.End
+
+Program.Sub.fmMain_UnLoad.Start
+F.Intrinsic.Control.End
+Program.Sub.fmMain_UnLoad.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
